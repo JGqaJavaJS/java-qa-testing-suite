@@ -29,7 +29,8 @@ public class UserController {
 
     @PostMapping
     public ResponseEntity<UserResponse> create(@Valid @RequestBody UserRequest request) {
-        UserResponse created = UserResponse.from(userService.create(request.name(), request.email()));
+        UserResponse created = UserResponse.from(
+                userService.create(request.name(), request.email(), request.password()));
         return ResponseEntity.created(URI.create("/api/users/" + created.id())).body(created);
     }
 
@@ -40,7 +41,8 @@ public class UserController {
 
     @PutMapping("/{id}")
     public UserResponse update(@PathVariable Long id, @Valid @RequestBody UserRequest request) {
-        return UserResponse.from(userService.update(id, request.name(), request.email()));
+        return UserResponse.from(
+                userService.update(id, request.name(), request.email(), request.password()));
     }
 
     @DeleteMapping("/{id}")

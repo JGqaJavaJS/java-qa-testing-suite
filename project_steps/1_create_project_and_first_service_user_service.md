@@ -98,7 +98,11 @@ docker-compose.yml
 Part 3 run app
 
 - open docker 
-- in idea in terminal: docker compose up --build
+- in idea in terminal: switch to folder: java-qa-testing-suite with cd ../.. if applicable
+docker compose up --build
+to stop: docker compose down
+to stop and to delete data: docker compose down -v
+to check running containers in docker: docker ps
 - in chrome open: http://localhost:8081/actuator/health (check the port number in terminal)
 - open second terminal in IDEA
 curl -i -X POST http://localhost:8081/api/users \
@@ -136,6 +140,9 @@ DELETE /api/users/1
 Success: 204 No Content, empty body
 Errors: 404 (user not found)
 
+Actuator is a Spring Boot module that adds built-in monitoring endpoints to the service.
+Why it matters for you as a tester: it is a ready-made target for health checks, smoke tests and monitoring tests, and it is exactly what real QA teams use to check that an environment is up before running tests.
+
 5. Health check (Actuator)
 
 GET /actuator/health → 200, {"status":"UP"}
@@ -147,13 +154,128 @@ GET /actuator/info → 200
 7. Metrics (Actuator)
 
 GET /actuator/metrics → 200, list of metric names
-GET /actuator/metrics/{name}, for example /actuator/metrics/jvm.memory.used
+GET /actuator/metrics/{name}, for example /actuator/metrics/application.ready.time
 
 Error response format (same for 400, 404, 409):
 
 json
-{"timestamp":"...","status":404,"error":"Not Found","message":"User not found: 99"}                                                             
+{"timestamp":"...","status":404,"error":"Not Found","message":"User not found: 99"}                
 
+TESTS in Postman
+- download deckstop posman
+- create collection
+
+Part 4. add password and JWT
+
+apps/user-service/pom.xml add dependencies
+new file src/main/resources/db/migration/V2__add_password_hash_to_users.sql
+updated src/main/java/com/qasuite/user_service/model/User.java
+updated src/main/java/com/qasuite/user_service/dto/UserRequest.java
+updated src/main/java/com/qasuite/user_service/service/UserService.java
+updated src/main/java/com/qasuite/user_service/controller/UserController.java
+add src/main/java/com/qasuite/user_service/security/JwtService.java
+updated src/main/resources/application.properties
+add src/main/java/com/qasuite/user_service/security/JwtAuthFilter.java
+add src/main/java/com/qasuite/user_service/security/SecurityConfig.java
+add src/main/java/com/qasuite/user_service/dto/LoginRequest.java
+add src/main/java/com/qasuite/user_service/dto/LoginResponse.java
+add src/main/java/com/qasuite/user_service/controller/AuthController.java
+add src/main/java/com/qasuite/user_service/exception/InvalidCredentialsException.java
+updated src/main/java/com/qasuite/user_service/exception/GlobalExceptionHandler.java
+moved apps/user-service/README.md
+
+User Service API
+
+Base URL: http://localhost:8081
+
+Protected endpoints require the header Authorization: Bearer <token>. Get the token from POST /api/auth/login. It is valid for 60 minutes.
+
+Error response format
+
+All errors handled by the service use the same JSON body:
+
+json
+{
+  "timestamp": "2026-10-14T18:00:00.000Z",
+  "status": 404,
+  "error": "Not Found",
+  "message": "User not found: 99"
+}
+
+Exception: 401 caused by a missing, invalid or expired token returns an empty body (no JSON). 401 caused by wrong login credentials returns the JSON above.
+
+POST /api/users
+
+Create a user (registration). No authorization required.
+
+Request
+
+json
+{"name": "Carol", "email": "carol@example.com", "password": "secret123"}
+
+Validation rules: name must not be blank; email must be a valid, unique email; password must not be blank and must be at least 6 characters.
+
+Code	Meaning	Message
+201	User created. Header Location: /api/users/{id}. Body: id, name, email (the password is never returned).	n/a
+400	Validation failed	name: name must not be blank, email: email must not be blank, email: email must be a valid email address, password: password must not be blank, password: password must be at least 6 characters
+409	Email already registered	Email already exists: carol@example.com
+
+If several fields are invalid, the messages are joined with ; and sorted alphabetically, for example: email: email must be a valid email address; password: password must be at least 6 characters.
+
+POST /api/auth/login
+
+Log in and get a token. No authorization required.
+
+Request
+
+json
+{"email": "carol@example.com", "password": "secret123"}
+Code	Meaning	Message
+200	Success. Body: token, tokenType (Bearer), expiresInMinutes (60).	n/a
+400	Validation failed	email: email must not be blank, password: password must not be blank
+401	Wrong email or password	Invalid email or password
+
+The same message is returned for an unknown email and for a wrong password, so existing emails cannot be guessed.
+
+GET /api/users/{id}
+
+Get a user by id. Requires a token. (bearer token in authorisation)
+
+Example: GET /api/users/3, Authorization: Bearer Token.
+
+Code	Meaning	Message
+200	Success. Body: id, name, email.	n/a
+401	Token missing, invalid or expired	empty body
+404	User not found	User not found: 3
+PUT /api/users/{id}
+
+Update a user (full update). Requires a token. All three fields are required, and the password is overwritten.
+
+Example: PUT /api/users/3, Authorization: Bearer Token.
+
+Request
+
+json
+{"name": "Carol Smith", "email": "carol.smith@example.com", "password": "newsecret123"}
+Code	Meaning	Message
+200	Success. Body: the updated user.	n/a
+400	Validation failed (same rules as POST /api/users)	for example password: password must be at least 6 characters
+401	Token missing, invalid or expired	empty body
+404	User not found	User not found: 3
+409	Email is already used by another user	Email already exists: carol.smith@example.com
+DELETE /api/users/{id}
+
+Delete a user. Requires a token. No request body.
+
+Example: DELETE /api/users/3, Authorization: Bearer Token (or {{token}} in Postman).
+
+Code	Meaning	Message
+204	User deleted. Empty body.	n/a
+401	Token missing, invalid or expired	empty body
+404	User not found	User not found: 3
+
+                                             
+add Postman collection: project_steps/1_my_user_service.postman_collection.json
 
 
 
