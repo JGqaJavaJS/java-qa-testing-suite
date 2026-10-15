@@ -114,7 +114,12 @@ curl -i -X POST http://localhost:8081/api/users \
   
   All requests of User Service (base URL http://localhost:8081)
 
-1. Create user
+1. for negative tests:
+   name not empty
+   email valid format and not empty
+   password not empty and at least 6 characters
+
+2. Create user
 
 POST /api/users
 Body (JSON): {"name":"Anna","email":"anna@example.com"}

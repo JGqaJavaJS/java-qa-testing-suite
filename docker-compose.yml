@@ -4,11 +4,11 @@ services:
     container_name: qa-mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
-      MYSQL_DATABASE: users_db
     ports:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+      - ./infra/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root}"]
       interval: 5s
@@ -27,6 +27,19 @@ services:
       DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
     ports:
       - "${USER_SERVICE_PORT:-8081}:8081"
+
+  order-service:
+    build: ./apps/order_service
+    container_name: qa-order-service
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/orders_db
+      DB_USER: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+    ports:
+      - "${ORDER_SERVICE_PORT:-8082}:8082"
 
 volumes:
   mysql-data:
