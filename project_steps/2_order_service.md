@@ -271,3 +271,423 @@ If the database is down, `/actuator/health` returns `503` with `"status": "DOWN"
 
 add docs/known-bugs.md
 updated README.md
+
+POSTMAN - not available for export
+
+Step 1: Query orders (all fields) works as GET
+return all orders, each order has all fields
+
+In Postman:
+
+Click New → GraphQL to create a GraphQL request.
+Enter the URL: http://localhost:8082/graphql
+Open the Query tab and paste:
+graphql
+query {
+orders {
+id
+userId
+productName
+quantity
+totalPrice
+status
+createdAt
+}
+}
+Click Query (the blue button next to the URL).
+Click Save. Postman offers to create a collection: 
+name it order_service_graphql and save the request as orders - all fields.
+
+Expected result: 200 OK and data.orders contains the Keyboard order.
+
+Step 2: Same query, only two fields, works as GET
+return all orders, each order has only productName and totalPrice
+In Postman:
+
+In the collection order_service_graphql, duplicate the request orders
+- all fields (right-click → Duplicate) and rename the copy to orders
+- - two fields.
+Open the Query tab and replace the query with:
+graphql
+query {
+orders {
+productName
+totalPrice
+}
+}
+Click Query.
+Click Save.
+
+Expected result: 200 OK, and each order in data.orders contains only productName 
+and totalPrice.
+
+Difference from REST: in REST the server decides which fields to return 
+(GET /api/users/1 always returns id, name and email). In GraphQL the client 
+lists the needed fields in the query, so the response contains exactly those 
+fields.
+
+Step 3: Create an order (mutation) works as POST
+
+In Postman:
+
+In the collection order_service_graphql, click New → GraphQL.
+Enter the URL: http://localhost:8082/graphql
+Open the Query tab and paste:
+graphql
+mutation {
+createOrder(input: {userId: 3, productName: "Mouse", quantity: 3, unitPrice: "10.50"}) {
+id
+userId
+productName
+quantity
+totalPrice
+status
+}
+}
+Click Query.
+Click Save and name the request createOrder.
+
+Expected result: 200 OK, data.createOrder has 
+"id": "2", "totalPrice": "31.50", "status": "NEW".
+
+Step 4: Create an order with missing fields works as POST
+
+required fields: userId, productName, quantity и unitPrice
+
+In Postman:
+
+In the collection order_service_graphql, click New → GraphQL.
+Enter the URL: http://localhost:8082/graphql
+Open the Query tab and paste:
+graphql
+mutation {
+createOrder(input: {userId: 3, productName: "Keyboard"}) {
+id
+productName
+totalPrice
+status
+}
+}
+Click Query.
+Click Save and name the request createOrder - missing fields.
+
+Expected result: 200 OK,
+"message": "Validation error (WrongType@[createOrder]) : 
+argument 'input' with value 'ObjectValue{objectFields=[ObjectField{name='userId', 
+value=IntValue{value=3}}, ObjectField{name='productName', 
+value=StringValue{value='Keyboard'}}]}' is missing required fields 
+'[quantity, unitPrice]'",
+
+Step 5: Query with an unknown field works as POST
+
+In Postman:
+
+In the collection order_service_graphql, click New → GraphQL.
+Enter the URL: http://localhost:8082/graphql
+Open the Query tab and paste:
+graphql
+query {
+orders {
+id
+foo
+}
+}
+Click Query.
+Click Save and name the request orders - unknown field.
+
+Expected result: 200 OK, in errors a message Validation error 
+(FieldUndefined@[orders/foo]) : Field 'foo' in type 'Order' is undefined, 
+with "classification": 
+"ValidationError".
+
+Step 6: Filter orders(userId: 3) works as GET
+get all orders for 1 user by userId
+In Postman:
+
+In the collection order_service_graphql, click New → GraphQL.
+Enter the URL: http://localhost:8082/graphql
+Open the Query tab and paste:
+graphql
+query {
+orders(userId: 3) {
+id
+userId
+productName
+totalPrice
+}
+}
+Click Query.
+Click Save and name the request orders - filter by userId.
+
+Expected result: 200 OK, data.orders contains the orders of user 3 
+(Keyboard and Mouse), and every item has "userId": "3".
+
+Step 7: Filter orders(userId: 999) works as GET
+
+User 999 not exist
+In Postman:
+
+In the collection order_service_graphql, click New → GraphQL.
+Enter the URL: http://localhost:8082/graphql
+Open the Query tab and paste:
+graphql
+query {
+orders(userId: 999) {
+id
+userId
+productName
+totalPrice
+}
+}
+Click Query.
+Click Save and name the request orders - filter by unknown userId.
+
+Expected result: 200 OK, "data": {"orders": []}, no errors field.
+
+Step 8: Wrong data types
+
+8.1 Text in quantity works as POST
+
+Negative test for create an order
+send a string instead of an Int in quantity, for example "two" instead of 2
+The server should return a ValidationError.
+
+In Postman:
+
+In the collection order_service_graphql, click New → GraphQL.
+Enter the URL: http://localhost:8082/graphql
+Open the Query tab and paste:
+graphql
+mutation {
+createOrder(input: {userId: 3, productName: "Test", quantity: "two", unitPrice: "10.00"}) {
+id
+}
+}
+Click Query.
+Click Save and name the request createOrder - wrong type quantity.
+
+Expected result: 200 OK, a ValidationError in errors (the value "two" is 
+not an Int), no data.
+
+8.2 Letters in userId
+
+Negative test for create an order
+send a string instead of an Int in userId, for example "two" instead of 2
+The server should return a ValidationError.
+
+Repeat the same steps with this query and the name createOrder - 
+wrong type userId:
+
+graphql
+mutation {
+createOrder(input: {userId: "abc", productName: "Test", quantity: 1, unitPrice: "10.00"}) {
+id
+}
+}
+
+Expected result: 200 OK and an error in errors. 
+The exact text is not known yet (userId is an ID, 
+so the failure may come from the conversion to a number, 
+not from schema validation). 
+
+-----------------
+
+add PUT and DELETE  
+
+update apps/order_service/src/main/resources/graphql/schema.graphqls
+add src/main/java/com/qasuite/order_service/exception/OrderNotFoundException.java
+update src/main/java/com/qasuite/order_service/service/OrderService.java
+update src/main/java/com/qasuite/order_service/graphql/OrderGraphQlController.java
+
+Reload all Maven Projects
+docker compose up --build
+
+POSTMAN, part 2
+
+9. Update an order status (updateOrder) works as PUT
+
+In Postman:
+
+In the collection order_service_graphql, click New → GraphQL.
+Enter the URL: http://localhost:8082/graphql
+Open the Query tab and paste:
+graphql
+mutation {
+updateOrder(id: 1, status: "PAID") {
+id
+productName
+status
+}
+}
+Click Query.
+Click Save and name the request updateOrder.
+
+Expected result: 200 OK, "id": "1", "productName": "Keyboard", "status": "PAID".
+
+10. Delete an order (deleteOrder) works as DELETE
+
+In Postman:
+
+In the collection order_service_graphql, click New → GraphQL.
+Enter the URL: http://localhost:8082/graphql
+Open the Query tab and paste:
+graphql
+mutation {
+deleteOrder(id: 2)
+}
+Click Query.
+Click Save and name the request deleteOrder.
+
+Expected result: 200 OK, "data": {"deleteOrder": true}.
+
+11. Delete a non-existent order
+
+In Postman:
+
+In the collection order_service_graphql, click New → GraphQL.
+Enter the URL: http://localhost:8082/graphql
+Open the Query tab and paste:
+graphql
+mutation {
+deleteOrder(id: 2)
+}
+Click Query.
+Click Save and name the request deleteOrder - not found.
+
+Expected result: 200 OK, "data": null, and in errors a message 
+like INTERNAL_ERROR for ... with "classification": "INTERNAL_ERROR". 
+The text Order not found: 2 does not reach the client.
+
+12. Update a non-existent order
+
+In Postman:
+
+In the collection order_service_graphql, click New → GraphQL.
+Enter the URL: http://localhost:8082/graphql
+Open the Query tab and paste:
+graphql
+mutation {
+updateOrder(id: 999, status: "PAID") {
+id
+status
+}
+}
+Click Query.
+Click Save and name the request updateOrder - not found.
+
+Expected result: 200 OK, "data": null, and in errors 
+a message like INTERNAL_ERROR 
+for ... with "classification": "INTERNAL_ERROR".
+
+13. Update with an invalid status
+exist only one status: NEW
+In Postman:
+
+In the collection order_service_graphql, click New → GraphQL.
+Enter the URL: http://localhost:8082/graphql
+Open the Query tab and paste:
+graphql
+mutation {
+updateOrder(id: 1, status: "abc") {
+id
+productName
+status
+}
+}
+Click Query.
+Click Save and name the request updateOrder - invalid status.
+
+Expected result: 200 OK, "id": "1", "status": "abc"
+
+14. Create an order with a quantity: 0
+
+In Postman:
+
+In the collection order_service_graphql, click New → GraphQL.
+URL: http://localhost:8082/graphql
+Open the Query tab and paste:
+graphql
+mutation {
+createOrder(input: {userId: 3, productName: "Zero", quantity: 0, 
+unitPrice: "10.00"}) {
+id
+quantity
+totalPrice
+status
+}
+}
+Click Query, then Save as createOrder - quantity zero.
+
+Expected result: 200 OK, a new order with "quantity": 
+0 and "totalPrice": "0.00".
+
+
+# Order Service: more negative tests (ideas)
+
+**createOrder: input values**
+
+- Negative `unitPrice` (`"-5.00"`)
+- Zero `unitPrice` (`"0.00"`)
+- Non-numeric `unitPrice` (`"abc"`)
+- Empty `unitPrice` (`""`)
+- `unitPrice` with more than 2 decimal places (`"19.999"`)
+- `unitPrice` with a comma instead of a dot (`"19,99"`)
+- Total price above `99999999.99` (does not fit into `DECIMAL(10, 2)`)
+- Very large `quantity` (`2147483647`, then `2147483648` as out of `Int` range)
+- Empty `productName` (`""`)
+- Whitespace-only `productName` (`"   "`)
+- `productName` longer than 255 characters
+- `productName` with special characters, emoji, SQL fragments (`'; DROP TABLE orders; --`), HTML or script tags
+- Non-existent `userId` (`99999`)
+- Zero or negative `userId` (`0`, `-1`)
+- Very large `userId` (beyond `Long` range)
+- Non-numeric `userId` (`"abc"`, already checked, returns `INTERNAL_ERROR`)
+
+**createOrder: structure of the request**
+
+- Missing required field (checked)
+- Wrong type (checked for `quantity`)
+- `null` for a required field
+- Extra unknown field in `input`
+- Missing `input` completely
+- Duplicate orders: same data sent twice (no idempotency)
+
+**updateOrder / deleteOrder**
+
+- Non-existent `id` (checked, returns `INTERNAL_ERROR`)
+- Non-numeric `id` (`"abc"`)
+- Negative or zero `id`
+- Very large `id`
+- Empty `status` (`""`)
+- `status` with 1000+ characters
+- `status` with special characters
+- Delete the same order twice (checked)
+- Update an order after it was deleted
+
+**Query orders**
+
+- Unknown field (checked)
+- `userId` as text (`"abc"`)
+- Negative `userId`
+- Empty selection (`orders { }`)
+- Deeply nested or repeated fields
+- Same field requested many times via aliases (basic load check)
+- Syntax errors: missing brace, missing quote, empty query (checked)
+
+**Protocol level**
+
+- `GET /graphql` instead of `POST`
+- Wrong or missing `Content-Type` header
+- Malformed JSON body
+- Empty body
+- Very large request body
+- Unknown operation name when several operations are sent
+
+**Actuator**
+
+- `GET /actuator/metrics/unknown.metric` (expect `404`)
+- `POST` to `/actuator/health` (expect `405`)
+- `/actuator/health` while MySQL is stopped (expect `503`, `DOWN`)
+
+updated readme file and known_bugs.md
+add postman collection for order service 

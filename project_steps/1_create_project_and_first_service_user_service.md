@@ -283,6 +283,101 @@ Code	Meaning	Message
 add Postman collection: project_steps/1_my_user_service.postman_collection.json
 
 
+# User Service: negative tests (ideas)
 
+**POST /api/users (registration)**
+
+- Empty `name` (`""`), whitespace-only `name` (`"   "`), missing `name`, `null` name
+- Empty, missing or `null` `email`
+- Invalid `email` formats (`abc`, `abc@`, `@example.com`, `a b@example.com`, double `@@`)
+- Duplicate `email` (expect `409`), same email in different case (`ANNA@example.com` vs `anna@example.com`)
+- Empty, missing or `null` `password`
+- `password` shorter than 6 characters (5 chars fails, 6 chars passes: boundary)
+- Whitespace-only `password` (`"      "`)
+- `name` or `email` longer than 255 characters (bug 4: database error instead of `400`)
+- Very long `password` (BCrypt only uses the first 72 bytes, so two long passwords with the same start behave the same)
+- `name` with special characters, emoji, SQL fragments (`'; DROP TABLE users; --`), HTML or script tags
+- Wrong types (`"name": 123`, `"email": true`)
+- Extra unknown field in the body (for example `"role": "ADMIN"`)
+- Malformed JSON, empty body, wrong or missing `Content-Type`
+- Send the same request twice quickly (race on unique email)
+- Send `id` in the body (it must be ignored)
+
+**POST /api/auth/login**
+
+- Wrong password for an existing email (expect `401`)
+- Unknown email (expect `401`, the same message, so emails cannot be guessed)
+- Empty or missing `email` or `password` (expect `400`)
+- Email in a different case
+- Login for users 1 and 2 (created before passwords, empty hash): login must fail
+- Login after the user was deleted (expect `401`)
+- Login after the password was changed: the old password must fail, the new one must pass
+- SQL fragments in `email` (`' OR '1'='1`)
+- Very long `email` or `password`
+- Many failed attempts in a row (no rate limiting, no lockout)
+
+**Token (all protected endpoints)**
+
+- No `Authorization` header (expect `401`, empty body: bug 3)
+- Header without `Bearer ` prefix, or with another scheme (`Basic ...`)
+- Empty token (`Bearer `)
+- Random string instead of a token
+- Token with a changed character (broken signature)
+- Token with a modified payload (for example another `sub`) and the old signature
+- Token with `alg: none`
+- Expired token (set `JWT_EXPIRATION_MINUTES=1` and wait)
+- Token of a deleted user (bug 2: keeps working)
+- Token of user A used on user B's record (bug 1: allowed)
+- Token sent twice in the header, or in a query parameter instead of the header
+
+**GET /api/users/{id}**
+
+- Non-existent `id` (`999`, expect `404`)
+- `id` as text (`abc`), negative (`-1`), zero (`0`), decimal (`1.5`)
+- `id` beyond `Long` range (`99999999999999999999`)
+- Another user's `id` with a valid token (bug 1)
+- Deleted user's `id` (expect `404`)
+- Trailing slash (`/api/users/3/`) and `GET /api/users` without id (expect `405`)
+
+**PUT /api/users/{id}**
+
+- All validation cases from registration (empty, invalid, short, too long)
+- Missing `password` (expect `400`, the update is full)
+- Email already used by another user (expect `409`)
+- Same email as the current one (must pass)
+- Non-existent `id` (expect `404`)
+- Update another user's record with a valid token (bug 1)
+- `id` in the body different from the `id` in the URL
+- Check the old password stops working after the update
+- Concurrent updates of the same user
+
+**DELETE /api/users/{id}**
+
+- Non-existent `id` (expect `404`)
+- Delete the same user twice (second call `404`)
+- Delete another user's record with a valid token (bug 1)
+- Delete yourself, then use the same token (bug 2)
+- `id` as text, negative, zero
+- Body sent with `DELETE` (must be ignored)
+
+**Protocol level**
+
+- Wrong HTTP method on each path (`PATCH /api/users/3`, `GET /api/auth/login`: expect `405`)
+- Wrong `Content-Type` (`text/plain`, `application/xml`: expect `415`)
+- Very large request body
+- Unknown path (`/api/unknown`: expect `401` without a token, `404` with a token)
+
+**Actuator**
+
+- `GET /actuator/metrics/unknown.metric` (expect `404`)
+- `POST` to `/actuator/health` (expect `405`)
+- `/actuator/health` while MySQL is stopped (expect `503`, `DOWN`)
+- Endpoints not exposed (`/actuator/env`, `/actuator/beans`: expect `404`)
+
+**Data checks (database)**
+
+- Password is stored as a BCrypt hash (`$2a$...`), never as plain text
+- The same password for two users gives two different hashes
+- Response never contains `password` or `passwordHash`
 
 

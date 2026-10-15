@@ -37,6 +37,16 @@ public class OrderGraphQlController {
                 new BigDecimal(input.getUnitPrice()));
     }
 
+    @MutationMapping
+    public Order updateOrder(@Argument Long id, @Argument String status) {
+        return orderService.updateStatus(id, status);
+    }
+
+    @MutationMapping
+    public boolean deleteOrder(@Argument Long id) {
+        return orderService.delete(id);
+    }
+
     @SchemaMapping(typeName = "Order", field = "totalPrice")
     public String totalPrice(Order order) {
         return order.getTotalPrice().toPlainString();

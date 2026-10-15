@@ -15,8 +15,8 @@ A demo application built as a target for manual and automated testing practice.
 
 ## Services
 
-- **[User Service](apps/user-service/README.md)** (port 8081): REST API, JWT authentication, MySQL, Flyway
-- **[Order Service](apps/order_service/README.md)** (port 8082): GraphQL API, MySQL, Flyway
+- **[User Service](apps/user-service/README.md)** (port 8081): REST API (create, get, update, delete users), JWT authentication, MySQL, Flyway
+- **[Order Service](apps/order_service/README.md)** (port 8082): GraphQL API (query orders, create, update status, delete), MySQL, Flyway
 
 ## Tools already added
 
@@ -26,7 +26,7 @@ A demo application built as a target for manual and automated testing practice.
 - MySQL 8.4, Flyway migrations
 - Docker, Docker Compose (multi-stage Dockerfiles)
 - Spring Boot Actuator (health, info, metrics)
-- Postman collections
+- Postman collections (REST and GraphQL)
 
 ## Intentional bugs
 
@@ -48,7 +48,7 @@ Requirements: Docker Desktop, 4+ GB of memory for Docker.
 | Component | URL / port |
 |-----------|------------|
 | User Service | http://localhost:8081 |
-| Order Service | http://localhost:8082 |
+| Order Service (GraphQL) | http://localhost:8082/graphql |
 | GraphiQL | http://localhost:8082/graphiql |
 | MySQL | localhost:3306 |
 

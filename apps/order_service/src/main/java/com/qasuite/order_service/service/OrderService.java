@@ -1,5 +1,6 @@
 package com.qasuite.order_service.service;
 
+import com.qasuite.order_service.exception.OrderNotFoundException;
 import com.qasuite.order_service.model.Order;
 import com.qasuite.order_service.repository.OrderRepository;
 import org.springframework.stereotype.Service;
@@ -31,5 +32,21 @@ public class OrderService {
     @Transactional(readOnly = true)
     public List<Order> findByUserId(Long userId) {
         return orderRepository.findByUserId(userId);
+    }
+
+    @Transactional
+    public Order updateStatus(Long id, String status) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new OrderNotFoundException(id));
+        order.setStatus(status);
+        return orderRepository.save(order);
+    }
+
+    @Transactional
+    public boolean delete(Long id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new OrderNotFoundException(id));
+        orderRepository.delete(order);
+        return true;
     }
 }
